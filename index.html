@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#02050c" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%2302050c'/%3E%3Cpath d='M8 18.5c4.1-1 7.6-4.5 8.8-9.1.4 5.2 2.6 9.1 7.2 11.7' fill='none' stroke='%23f3f3ef'/%3E%3Ccircle cx='21.6' cy='9.3' r='1.2' fill='%23f3f3ef'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="A quiet, procedural meteor shower viewed from beneath a dark summer sky."
+    />
+    <title>Nocturne — Meteor Shower</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#controls">Skip to controls</a>
+
+    <main class="sky" aria-label="An immersive meteor shower at night">
+      <canvas id="sky-canvas" aria-hidden="true"></canvas>
+      <div class="atmosphere" aria-hidden="true"></div>
+      <div class="grain" aria-hidden="true"></div>
+
+      <header class="site-header">
+        <a class="brand" href="#" aria-label="Nocturne, return to the sky">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="16" cy="16" r="14.5"></circle>
+            <path d="M8 18.5c4.1-1 7.6-4.5 8.8-9.1.4 5.2 2.6 9.1 7.2 11.7"></path>
+            <circle cx="21.6" cy="9.3" r="1.2" class="brand-star"></circle>
+          </svg>
+          <span>NOCTURNE</span>
+        </a>
+        <p class="site-kicker">A dark-sky study</p>
+      </header>
+
+      <section class="intro" aria-labelledby="intro-title">
+        <p class="eyebrow"><span></span> Under the Perseids</p>
+        <h1 id="intro-title">Look up.</h1>
+        <p class="intro-copy">Let your eyes adjust.<br />The sky will come to you.</p>
+      </section>
+
+      <p class="interaction-hint" id="interaction-hint">
+        <span class="hint-mark" aria-hidden="true">✦</span>
+        Touch the sky to make a wish
+      </p>
+
+      <section class="controls" id="controls" aria-label="Sky controls">
+        <div class="observation" aria-live="polite">
+          <span class="observation-dot" aria-hidden="true"></span>
+          <span id="meteor-count">Waiting for first light</span>
+        </div>
+        <div class="control-buttons">
+          <button id="sound-toggle" type="button" aria-label="Enable night sounds" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6.7 8.5H3.5v7h3.2L11 19V5Z"></path>
+              <path class="sound-wave" d="M14.5 9.1a4 4 0 0 1 0 5.8M17.4 6.6a7.5 7.5 0 0 1 0 10.8"></path>
+            </svg>
+            <span>Night sounds</span>
+          </button>
+          <button id="motion-toggle" type="button" aria-label="Pause sky motion" aria-pressed="false">
+            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 6.5v11M16 6.5v11"></path>
+            </svg>
+            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 6.5 8 5.5-8 5.5v-11Z"></path>
+            </svg>
+            <span>Pause sky</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="edge-mark edge-mark--left" aria-hidden="true">N&nbsp;&nbsp;42°</div>
+      <div class="edge-mark edge-mark--right" aria-hidden="true">∞</div>
+      <p class="sr-only" id="motion-description">
+        Meteors appear at irregular intervals and travel outward from a shared radiant point.
+      </p>
+    </main>
+
+    <noscript>
+      <p class="noscript">Enable JavaScript to watch the meteor shower.</p>
+    </noscript>
+  </body>
+</html>

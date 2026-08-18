@@ -1,0 +1,11 @@
+{
+  "name": "nocturne-meteor-shower",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A quiet, procedural meteor shower viewed from beneath a dark summer sky.",
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "start": "python3 -m http.server 4173",
+    "check": "node --check app.js"
+  }
+}
