@@ -91,6 +91,7 @@ button {
   align-items: center;
   justify-content: space-between;
   pointer-events: none;
+  transition: opacity 700ms ease;
 }
 
 .brand {
@@ -139,7 +140,7 @@ button {
 }
 
 .intro.is-resting {
-  opacity: 0.16;
+  opacity: 0.035;
   transform: translateY(0.35rem);
 }
 
@@ -218,7 +219,27 @@ h1 {
   display: flex;
   align-items: center;
   gap: 1.25rem;
+  opacity: 0.72;
   cursor: default;
+  transition: opacity 500ms ease;
+}
+
+.controls:hover,
+.controls:focus-within {
+  opacity: 1;
+}
+
+.sky.cursor-idle .site-header {
+  opacity: 0.18;
+}
+
+.sky.cursor-idle .controls {
+  opacity: 0.14;
+}
+
+.sky.cursor-idle .site-header:focus-within,
+.sky.cursor-idle .controls:focus-within {
+  opacity: 1;
 }
 
 .observation {

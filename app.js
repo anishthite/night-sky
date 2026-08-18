@@ -61,6 +61,11 @@
     return a + (b - a) * amount;
   }
 
+  function smoothstep(edge0, edge1, value) {
+    const amount = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+    return amount * amount * (3 - 2 * amount);
+  }
+
   function randomBetween(min, max, random = Math.random) {
     return min + random() * (max - min);
   }
@@ -97,11 +102,11 @@
   }
 
   function generateStars() {
-    const starCount = Math.round(clamp((width * height) / 1550, 430, 980));
+    const starCount = Math.round(clamp((width * height) / 1250, 520, 1180));
     stars = [];
 
     for (let i = 0; i < starCount; i += 1) {
-      const inMilkyWay = seededRandom() < 0.19;
+      const inMilkyWay = seededRandom() < 0.23;
       let x = seededRandom();
       let y = seededRandom();
 
@@ -117,9 +122,9 @@
         continue;
       }
 
-      const magnitudeRoll = Math.pow(seededRandom(), 4.6);
-      const radius = 0.26 + magnitudeRoll * 1.26;
-      const alpha = 0.18 + magnitudeRoll * 0.76;
+      const magnitudeRoll = Math.pow(seededRandom(), 5.8);
+      const radius = 0.2 + magnitudeRoll * 1.08;
+      const alpha = 0.14 + Math.pow(magnitudeRoll, 0.56) * 0.8;
       const color = palette[Math.floor(seededRandom() * palette.length)];
       stars.push({
         x,
@@ -129,7 +134,7 @@
         color,
         phase: seededRandom() * TAU,
         twinkleSpeed: randomBetween(0.00022, 0.0006, seededRandom),
-        twinkles: radius > 0.72 && seededRandom() < 0.42,
+        twinkles: radius > 0.62 && seededRandom() < 0.28,
         depth: randomBetween(0.15, 1, seededRandom),
       });
     }
@@ -146,6 +151,20 @@
     context.fillStyle = skyGradient;
     context.fillRect(0, 0, width, height);
 
+    const airglow = context.createRadialGradient(
+      width * 0.46,
+      height * 1.08,
+      0,
+      width * 0.46,
+      height * 1.08,
+      Math.max(width, height) * 0.78,
+    );
+    airglow.addColorStop(0, "rgba(37, 68, 68, 0.075)");
+    airglow.addColorStop(0.42, "rgba(23, 45, 51, 0.035)");
+    airglow.addColorStop(1, "rgba(9, 20, 31, 0)");
+    context.fillStyle = airglow;
+    context.fillRect(0, height * 0.38, width, height * 0.62);
+
     paintMilkyWay(context);
 
     for (const star of stars) {
@@ -153,13 +172,13 @@
       const y = star.y * height;
       const [r, g, b] = star.color;
 
-      if (star.radius > 1.1) {
-        const glow = context.createRadialGradient(x, y, 0, x, y, star.radius * 5.5);
-        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${star.alpha * 0.26})`);
+      if (star.radius > 0.96) {
+        const glow = context.createRadialGradient(x, y, 0, x, y, star.radius * 3.8);
+        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${star.alpha * 0.16})`);
         glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         context.fillStyle = glow;
         context.beginPath();
-        context.arc(x, y, star.radius * 5.5, 0, TAU);
+        context.arc(x, y, star.radius * 3.8, 0, TAU);
         context.fill();
       }
 
@@ -186,6 +205,38 @@
     haze.addColorStop(1, "rgba(89, 107, 121, 0)");
     context.fillStyle = haze;
     context.fillRect(-diagonal / 2, -height * 0.24, diagonal, height * 0.48);
+    context.restore();
+
+    // Uneven luminous puffs create the Milky Way's cloudlike stellar density.
+    context.save();
+    context.translate(width * 0.48, height * 0.48);
+    context.rotate(-0.72);
+    context.globalCompositeOperation = "screen";
+    context.filter = `blur(${Math.max(4, width * 0.0045)}px)`;
+    const cloudCount = Math.round(clamp(width / 10, 72, 150));
+    for (let cloud = 0; cloud < cloudCount; cloud += 1) {
+      const x = randomBetween(-diagonal * 0.52, diagonal * 0.52, seededRandom);
+      const normal = (seededRandom() + seededRandom() + seededRandom() - 1.5) / 1.5;
+      const centerRipple = Math.sin(x * 0.008) * height * 0.018;
+      const y = normal * height * 0.16 + centerRipple;
+      const density = Math.pow(1 - Math.min(1, Math.abs(normal)), 1.7);
+      const radius = randomBetween(20, Math.max(32, width * 0.07), seededRandom);
+      const warm = seededRandom() < 0.18;
+      const alpha = warm
+        ? randomBetween(0.008, 0.022, seededRandom) * density
+        : randomBetween(0.01, 0.032, seededRandom) * density;
+      context.save();
+      context.translate(x, y);
+      context.scale(randomBetween(0.75, 1.5, seededRandom), randomBetween(0.22, 0.5, seededRandom));
+      const cloudGlow = context.createRadialGradient(0, 0, 0, 0, 0, radius);
+      cloudGlow.addColorStop(0, warm ? `rgba(148, 138, 119, ${alpha})` : `rgba(119, 137, 146, ${alpha})`);
+      cloudGlow.addColorStop(1, "rgba(87, 104, 118, 0)");
+      context.fillStyle = cloudGlow;
+      context.beginPath();
+      context.arc(0, 0, radius, 0, TAU);
+      context.fill();
+      context.restore();
+    }
     context.restore();
 
     context.save();
@@ -264,37 +315,37 @@
   function paintTreeLine(context, baseY, color, scale, seedOffset) {
     const random = mulberry32(Math.round(width + height + seedOffset * 101));
     context.fillStyle = color;
-    const treeCount = Math.ceil(width / (38 * scale));
     const edgeAllowance = Math.max(0, 1 - width / 1300);
+    let x = randomBetween(-28, -8, random);
 
-    for (let i = 0; i <= treeCount; i += 1) {
-      const x = (i / treeCount) * width + randomBetween(-18, 18, random);
+    while (x < width + 35) {
       const edge = Math.abs(x / width - 0.5) * 2;
       const naturalHeight = randomBetween(25, 72, random) * scale;
       const treeHeight = naturalHeight * (0.72 + edge * (0.7 + edgeAllowance));
       const treeWidth = treeHeight * randomBetween(0.34, 0.55, random);
       paintPine(context, x, baseY + randomBetween(-4, 6, random), treeWidth, treeHeight, random);
+      x += randomBetween(24, 57, random) * scale;
     }
   }
 
   function paintPine(context, x, baseY, treeWidth, treeHeight, random) {
     context.beginPath();
     context.moveTo(x, baseY - treeHeight);
-    const layers = 6;
+    const layers = 7 + Math.floor(random() * 3);
     for (let layer = 1; layer <= layers; layer += 1) {
       const progress = layer / layers;
-      const y = baseY - treeHeight + treeHeight * progress;
-      const halfWidth = treeWidth * progress * randomBetween(0.78, 1.08, random);
+      const y = baseY - treeHeight + treeHeight * progress + randomBetween(-1.4, 1.4, random);
+      const halfWidth = treeWidth * Math.pow(progress, 0.82) * randomBetween(0.7, 1.12, random);
       context.lineTo(x - halfWidth, y);
-      context.lineTo(x - halfWidth * 0.25, y - treeHeight * 0.07);
+      context.lineTo(x - halfWidth * randomBetween(0.18, 0.36, random), y - treeHeight * randomBetween(0.045, 0.085, random));
     }
     context.lineTo(x - treeWidth * 0.08, baseY);
     context.lineTo(x + treeWidth * 0.08, baseY);
     for (let layer = layers; layer >= 1; layer -= 1) {
       const progress = layer / layers;
-      const y = baseY - treeHeight + treeHeight * progress;
-      const halfWidth = treeWidth * progress * randomBetween(0.78, 1.08, random);
-      context.lineTo(x + halfWidth * 0.25, y - treeHeight * 0.07);
+      const y = baseY - treeHeight + treeHeight * progress + randomBetween(-1.4, 1.4, random);
+      const halfWidth = treeWidth * Math.pow(progress, 0.82) * randomBetween(0.7, 1.12, random);
+      context.lineTo(x + halfWidth * randomBetween(0.18, 0.36, random), y - treeHeight * randomBetween(0.045, 0.085, random));
       context.lineTo(x + halfWidth, y);
     }
     context.closePath();
@@ -333,10 +384,10 @@
     const distanceFromRadiant = Math.hypot(x - radiant.x, y - radiant.y);
     const perspective = clamp(distanceFromRadiant / (diagonal * 0.48), 0.18, 1);
     const fireball = intentional || Math.random() < 0.055;
-    const pathLength = randomBetween(105, fireball ? 440 : 310) * lerp(0.48, 1.08, perspective);
-    const speed = randomBetween(fireball ? 730 : 880, fireball ? 1120 : 1560);
+    const pathLength = randomBetween(105, fireball ? 430 : 300) * lerp(0.48, 1.08, perspective);
+    const speed = randomBetween(fireball ? 760 : 940, fireball ? 1180 : 1680);
     const travelDuration = pathLength / speed;
-    const trailLength = pathLength * randomBetween(fireball ? 0.42 : 0.24, fireball ? 0.66 : 0.48);
+    const trailLength = pathLength * randomBetween(fireball ? 0.36 : 0.18, fireball ? 0.58 : 0.38);
     const hue = Math.random();
     const color = hue < 0.2 ? [201, 222, 233] : hue > 0.82 ? [255, 224, 182] : [247, 242, 225];
 
@@ -348,13 +399,15 @@
       pathLength,
       trailLength,
       travelDuration,
-      totalDuration: travelDuration + (fireball ? 0.48 : 0.22),
+      totalDuration: travelDuration + (fireball ? 0.68 : 0.24),
       age: 0,
-      width: randomBetween(fireball ? 1.35 : 0.55, fireball ? 2.25 : 1.18),
+      width: randomBetween(fireball ? 1.05 : 0.38, fireball ? 1.72 : 0.88),
       brightness: randomBetween(fireball ? 0.92 : 0.48, 1),
       fireball,
       color,
       seed: Math.random() * TAU,
+      flareAt: randomBetween(0.36, 0.76),
+      texture: Array.from({ length: 20 }, () => randomBetween(0.72, 1.08)),
       fragments: fireball && Math.random() < 0.48,
     });
 
@@ -370,9 +423,9 @@
 
   function prepareCaptureMeteors() {
     meteorCount = 0;
-    createMeteor({ x: width * 0.42, y: height * 0.31 }, true);
+    createMeteor({ x: width * 0.42, y: height * 0.44 }, true);
     const fireball = meteors[meteors.length - 1];
-    fireball.age = fireball.travelDuration * 0.54;
+    fireball.age = fireball.travelDuration * 0.48;
 
     createMeteor({ x: width * 0.78, y: height * 0.43 });
     const faintMeteor = meteors[meteors.length - 1];
@@ -483,9 +536,9 @@
       const lifeFade = 1 - clamp((meteor.age - meteor.travelDuration * 0.7) / (meteor.totalDuration - meteor.travelDuration * 0.7), 0, 1);
       const headX = meteor.x + meteor.directionX * meteor.pathLength * travelProgress;
       const headY = meteor.y + meteor.directionY * meteor.pathLength * travelProgress;
-      const flash = ctx.createRadialGradient(headX, headY, 0, headX, headY, Math.min(width, height) * 0.34);
-      flash.addColorStop(0, `rgba(191, 211, 219, ${0.055 * lifeFade})`);
-      flash.addColorStop(0.3, `rgba(106, 137, 153, ${0.022 * lifeFade})`);
+      const flash = ctx.createRadialGradient(headX, headY, 0, headX, headY, Math.min(width, height) * 0.27);
+      flash.addColorStop(0, `rgba(191, 211, 219, ${0.035 * lifeFade})`);
+      flash.addColorStop(0.3, `rgba(106, 137, 153, ${0.014 * lifeFade})`);
       flash.addColorStop(1, "rgba(25, 42, 54, 0)");
       ctx.fillStyle = flash;
       ctx.fillRect(0, 0, width, height);
@@ -506,11 +559,16 @@
 
   function drawMeteor(meteor) {
     const travelProgress = clamp(meteor.age / meteor.travelDuration, 0, 1);
-    const easedProgress = 1 - Math.pow(1 - travelProgress, 2.2);
     const afterlife = clamp((meteor.age - meteor.travelDuration) / (meteor.totalDuration - meteor.travelDuration), 0, 1);
-    const fade = afterlife > 0 ? 1 - afterlife : Math.min(1, travelProgress * 5);
-    const headDistance = meteor.pathLength * easedProgress;
-    const currentTrail = Math.min(meteor.trailLength, headDistance * 0.94) * (1 - afterlife * 0.74);
+    const ignition = smoothstep(0, 0.065, travelProgress);
+    const trailFade = afterlife > 0 ? 1 - smoothstep(0, 1, afterlife) : ignition;
+    const headFade = afterlife > 0 ? 0 : ignition * (1 - smoothstep(0.86, 1, travelProgress) * 0.38);
+    const flareDistance = (travelProgress - meteor.flareAt) / (meteor.fireball ? 0.075 : 0.1);
+    const flare = Math.exp(-(flareDistance * flareDistance));
+    const luminance = meteor.brightness * (1 + flare * (meteor.fireball ? 0.72 : 0.18));
+    // Meteors retain nearly constant apparent speed; cinematic easing reads as artificial.
+    const headDistance = meteor.pathLength * travelProgress;
+    const currentTrail = Math.min(meteor.trailLength, headDistance * 0.97) * (1 - afterlife * 0.18);
     const headX = meteor.x + meteor.directionX * headDistance;
     const headY = meteor.y + meteor.directionY * headDistance;
     const tailX = headX - meteor.directionX * currentTrail;
@@ -521,48 +579,58 @@
     ctx.lineCap = "round";
     ctx.globalCompositeOperation = "screen";
 
-    const trailGradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
-    trailGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
-    trailGradient.addColorStop(0.48, `rgba(${r}, ${g}, ${b}, ${0.08 * meteor.brightness * fade})`);
-    trailGradient.addColorStop(0.88, `rgba(${r}, ${g}, ${b}, ${0.52 * meteor.brightness * fade})`);
-    trailGradient.addColorStop(1, `rgba(255, 250, 235, ${0.96 * fade})`);
-
-    ctx.strokeStyle = trailGradient;
-    ctx.lineWidth = meteor.width * 5.2;
-    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.42 * fade})`;
-    ctx.shadowBlur = meteor.fireball ? 18 : 9;
-    ctx.globalAlpha = meteor.fireball ? 0.22 : 0.13;
+    const glowGradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
+    glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+    glowGradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, ${0.035 * luminance * trailFade})`);
+    glowGradient.addColorStop(1, `rgba(255, 247, 226, ${0.2 * luminance * trailFade})`);
+    ctx.strokeStyle = glowGradient;
+    ctx.lineWidth = meteor.width * (meteor.fireball ? 4.4 : 3.1);
+    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.2 * trailFade})`;
+    ctx.shadowBlur = meteor.fireball ? 9 : 4;
     ctx.beginPath();
     ctx.moveTo(tailX, tailY);
     ctx.lineTo(headX, headY);
     ctx.stroke();
 
-    ctx.lineWidth = meteor.width;
-    ctx.shadowBlur = meteor.fireball ? 8 : 4;
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.moveTo(tailX, tailY);
-    ctx.lineTo(headX, headY);
-    ctx.stroke();
+    // Short, tapered sections preserve tiny intensity changes seen in real ionized trails.
+    const segmentCount = 18;
+    ctx.shadowBlur = 0;
+    for (let segment = 0; segment < segmentCount; segment += 1) {
+      const start = segment / segmentCount;
+      const end = Math.min(1, (segment + 1.06) / segmentCount);
+      const texture = meteor.texture[segment % meteor.texture.length];
+      const alpha = Math.min(1, Math.pow(end, 2.15) * 0.72 * luminance * trailFade * texture);
+      const nearHead = smoothstep(0.78, 1, end);
+      const red = Math.round(lerp(r, 255, nearHead * 0.72));
+      const green = Math.round(lerp(g, 249, nearHead * 0.7));
+      const blue = Math.round(lerp(b, 232, nearHead * 0.45));
+      ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      ctx.lineWidth = Math.max(0.22, meteor.width * (0.16 + Math.pow(end, 1.45) * 0.84));
+      ctx.beginPath();
+      ctx.moveTo(lerp(tailX, headX, start), lerp(tailY, headY, start));
+      ctx.lineTo(lerp(tailX, headX, end), lerp(tailY, headY, end));
+      ctx.stroke();
+    }
 
-    if (meteor.fireball) {
-      const core = ctx.createRadialGradient(headX, headY, 0, headX, headY, 7 * fade);
-      core.addColorStop(0, `rgba(255, 252, 238, ${fade})`);
-      core.addColorStop(0.25, `rgba(255, 220, 175, ${0.72 * fade})`);
+    if (meteor.fireball && headFade > 0) {
+      const coreRadius = (3.8 + flare * 1.8) * headFade;
+      const core = ctx.createRadialGradient(headX, headY, 0, headX, headY, coreRadius);
+      core.addColorStop(0, `rgba(255, 252, 238, ${Math.min(1, headFade * luminance)})`);
+      core.addColorStop(0.22, `rgba(255, 220, 175, ${0.58 * headFade})`);
       core.addColorStop(1, "rgba(190, 218, 228, 0)");
       ctx.fillStyle = core;
       ctx.beginPath();
-      ctx.arc(headX, headY, 7 * fade, 0, TAU);
+      ctx.arc(headX, headY, coreRadius, 0, TAU);
       ctx.fill();
-    } else {
-      ctx.fillStyle = `rgba(255, 251, 236, ${0.88 * fade})`;
+    } else if (headFade > 0) {
+      ctx.fillStyle = `rgba(255, 251, 236, ${0.86 * headFade * luminance})`;
       ctx.beginPath();
-      ctx.arc(headX, headY, Math.max(0.55, meteor.width * 0.72), 0, TAU);
+      ctx.arc(headX, headY, Math.max(0.34, meteor.width * 0.52), 0, TAU);
       ctx.fill();
     }
 
     if (meteor.fragments && travelProgress > 0.58) {
-      drawFragments(meteor, headX, headY, currentTrail, fade, r, g, b);
+      drawFragments(meteor, headX, headY, currentTrail, trailFade, r, g, b);
     }
 
     ctx.restore();
@@ -741,6 +809,7 @@
 
   window.setTimeout(() => intro.classList.add("is-resting"), 6800);
   window.setTimeout(() => hint.classList.add("is-hidden"), 12000);
+  cursorTimer = window.setTimeout(() => sky.classList.add("cursor-idle"), 4200);
 
   resize();
   motionToggle.disabled = reduceMotionQuery.matches;
