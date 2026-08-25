@@ -10,8 +10,10 @@
   const countDot = document.querySelector(".observation-dot");
   const motionToggle = document.querySelector("#motion-toggle");
   const soundToggle = document.querySelector("#sound-toggle");
+  const sceneButtons = [...document.querySelectorAll("[data-scene]")];
   const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const captureMode = new URLSearchParams(window.location.search).has("capture");
+  const query = new URLSearchParams(window.location.search);
+  const captureMode = query.has("capture");
 
   const TAU = Math.PI * 2;
   const palette = [
@@ -21,12 +23,31 @@
     [219, 228, 239],
     [238, 228, 207],
   ];
+  const scenes = {
+    "open-sky": {
+      source: "./assets/open-sky-nps.jpg",
+      // This is an astrophotograph, so keep its natural colour and exposure intact.
+      // A light reduction keeps the type legible without turning the sky into a blue wash.
+      filter: "brightness(0.82) saturate(0.82) contrast(0.98)",
+      mobileAnchor: "center",
+    },
+    "distant-butte": {
+      source: "./assets/distant-butte-nps.jpg",
+      filter: "brightness(0.68) saturate(0.68) contrast(0.98)",
+      mobileAnchor: "center",
+    },
+    "desert-tree": {
+      source: "./assets/nocturne-sky-nasa.jpg",
+      filter: "brightness(0.78) saturate(0.76) contrast(0.98)",
+      mobileAnchor: "left",
+    },
+  };
 
   let width = 0;
   let height = 0;
   let dpr = 1;
   let lastFrame = performance.now();
-  let nextMeteorAt = lastFrame + 900;
+  let nextMeteorAt = lastFrame + 18000 + Math.random() * 22000;
   let meteorCount = 0;
   let paused = reduceMotionQuery.matches;
   let pointerX = 0;
@@ -40,6 +61,9 @@
   let nextSatelliteAt = lastFrame + 26000 + Math.random() * 24000;
   let backgroundCanvas = document.createElement("canvas");
   let foregroundCanvas = document.createElement("canvas");
+  const skyPhoto = new Image();
+  let skyPhotoLoaded = false;
+  let activeScene = scenes[query.get("scene")] ? query.get("scene") : "open-sky";
   let seededRandom = mulberry32(0x5a17c9);
   let soundscape = null;
   let animationRequest = 0;
@@ -102,7 +126,16 @@
   }
 
   function generateStars() {
-    const starCount = Math.round(clamp((width * height) / 1250, 520, 1180));
+    // The base sky is an astrophotograph. Keeping its real stellar texture intact
+    // is more convincing than layering another procedurally generated star field.
+    if (skyPhotoLoaded) {
+      stars = [];
+      return;
+    }
+
+    // A dark-adapted eye catches far fewer stars than a long-exposure photograph.
+    // Keeping the field sparse gives the brighter stars and meteor trails room to breathe.
+    const starCount = Math.round(clamp((width * height) / 1850, 390, 790));
     stars = [];
 
     for (let i = 0; i < starCount; i += 1) {
@@ -122,9 +155,9 @@
         continue;
       }
 
-      const magnitudeRoll = Math.pow(seededRandom(), 5.8);
-      const radius = 0.2 + magnitudeRoll * 1.08;
-      const alpha = 0.14 + Math.pow(magnitudeRoll, 0.56) * 0.8;
+      const magnitudeRoll = Math.pow(seededRandom(), 7.2);
+      const radius = 0.18 + magnitudeRoll * 1.02;
+      const alpha = 0.1 + Math.pow(magnitudeRoll, 0.62) * 0.76;
       const color = palette[Math.floor(seededRandom() * palette.length)];
       stars.push({
         x,
@@ -134,7 +167,7 @@
         color,
         phase: seededRandom() * TAU,
         twinkleSpeed: randomBetween(0.00022, 0.0006, seededRandom),
-        twinkles: radius > 0.62 && seededRandom() < 0.28,
+        twinkles: radius > 0.68 && seededRandom() < 0.2,
         depth: randomBetween(0.15, 1, seededRandom),
       });
     }
@@ -143,11 +176,35 @@
   function paintBackground(context) {
     context.clearRect(0, 0, width, height);
 
+    if (skyPhotoLoaded) {
+      context.save();
+      context.filter = scenes[activeScene].filter;
+      drawImageCover(context, skyPhoto);
+      context.restore();
+
+      // The image carries the astronomical detail; this is only a restrained edge falloff
+      // to let the interface sit in the scene without making it feel composited on top.
+      const falloff = context.createRadialGradient(
+        width * 0.5,
+        height * 0.43,
+        Math.min(width, height) * 0.16,
+        width * 0.5,
+        height * 0.48,
+        Math.max(width, height) * 0.78,
+      );
+      falloff.addColorStop(0, "rgba(0, 3, 8, 0)");
+      falloff.addColorStop(0.72, "rgba(0, 3, 8, 0.035)");
+      falloff.addColorStop(1, "rgba(0, 2, 6, 0.2)");
+      context.fillStyle = falloff;
+      context.fillRect(0, 0, width, height);
+      return;
+    }
+
     const skyGradient = context.createLinearGradient(0, 0, 0, height);
     skyGradient.addColorStop(0, "#01040a");
-    skyGradient.addColorStop(0.46, "#030916");
-    skyGradient.addColorStop(0.78, "#071323");
-    skyGradient.addColorStop(1, "#0a1724");
+    skyGradient.addColorStop(0.46, "#030814");
+    skyGradient.addColorStop(0.78, "#06111d");
+    skyGradient.addColorStop(1, "#091520");
     context.fillStyle = skyGradient;
     context.fillRect(0, 0, width, height);
 
@@ -159,8 +216,8 @@
       height * 1.08,
       Math.max(width, height) * 0.78,
     );
-    airglow.addColorStop(0, "rgba(37, 68, 68, 0.075)");
-    airglow.addColorStop(0.42, "rgba(23, 45, 51, 0.035)");
+    airglow.addColorStop(0, "rgba(42, 67, 66, 0.09)");
+    airglow.addColorStop(0.42, "rgba(23, 43, 50, 0.03)");
     airglow.addColorStop(1, "rgba(9, 20, 31, 0)");
     context.fillStyle = airglow;
     context.fillRect(0, height * 0.38, width, height * 0.62);
@@ -189,6 +246,15 @@
     }
   }
 
+  function drawImageCover(context, image) {
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    const useOpenMobileCrop = width / height < 0.75 && scenes[activeScene].mobileAnchor === "left";
+    const horizontalOffset = useOpenMobileCrop ? 0 : (width - drawWidth) / 2;
+    context.drawImage(image, horizontalOffset, height - drawHeight, drawWidth, drawHeight);
+  }
+
   function paintMilkyWay(context) {
     const diagonal = Math.hypot(width, height) * 1.35;
     context.save();
@@ -197,14 +263,14 @@
     context.globalCompositeOperation = "screen";
     context.filter = `blur(${Math.max(22, width * 0.025)}px)`;
 
-    const haze = context.createLinearGradient(0, -height * 0.23, 0, height * 0.23);
+    const haze = context.createLinearGradient(0, -height * 0.21, 0, height * 0.21);
     haze.addColorStop(0, "rgba(95, 115, 132, 0)");
-    haze.addColorStop(0.28, "rgba(95, 112, 126, 0.025)");
-    haze.addColorStop(0.49, "rgba(132, 140, 140, 0.072)");
-    haze.addColorStop(0.58, "rgba(112, 124, 132, 0.045)");
+    haze.addColorStop(0.3, "rgba(95, 112, 126, 0.012)");
+    haze.addColorStop(0.49, "rgba(132, 140, 140, 0.042)");
+    haze.addColorStop(0.59, "rgba(112, 124, 132, 0.022)");
     haze.addColorStop(1, "rgba(89, 107, 121, 0)");
     context.fillStyle = haze;
-    context.fillRect(-diagonal / 2, -height * 0.24, diagonal, height * 0.48);
+    context.fillRect(-diagonal / 2, -height * 0.22, diagonal, height * 0.44);
     context.restore();
 
     // Uneven luminous puffs create the Milky Way's cloudlike stellar density.
@@ -213,18 +279,18 @@
     context.rotate(-0.72);
     context.globalCompositeOperation = "screen";
     context.filter = `blur(${Math.max(4, width * 0.0045)}px)`;
-    const cloudCount = Math.round(clamp(width / 10, 72, 150));
+    const cloudCount = Math.round(clamp(width / 16, 48, 94));
     for (let cloud = 0; cloud < cloudCount; cloud += 1) {
       const x = randomBetween(-diagonal * 0.52, diagonal * 0.52, seededRandom);
       const normal = (seededRandom() + seededRandom() + seededRandom() - 1.5) / 1.5;
       const centerRipple = Math.sin(x * 0.008) * height * 0.018;
-      const y = normal * height * 0.16 + centerRipple;
-      const density = Math.pow(1 - Math.min(1, Math.abs(normal)), 1.7);
-      const radius = randomBetween(20, Math.max(32, width * 0.07), seededRandom);
+      const y = normal * height * 0.135 + centerRipple;
+      const density = Math.pow(1 - Math.min(1, Math.abs(normal)), 2.15);
+      const radius = randomBetween(18, Math.max(30, width * 0.055), seededRandom);
       const warm = seededRandom() < 0.18;
       const alpha = warm
-        ? randomBetween(0.008, 0.022, seededRandom) * density
-        : randomBetween(0.01, 0.032, seededRandom) * density;
+        ? randomBetween(0.004, 0.012, seededRandom) * density
+        : randomBetween(0.005, 0.018, seededRandom) * density;
       context.save();
       context.translate(x, y);
       context.scale(randomBetween(0.75, 1.5, seededRandom), randomBetween(0.22, 0.5, seededRandom));
@@ -243,12 +309,12 @@
     context.translate(width * 0.48, height * 0.48);
     context.rotate(-0.72);
     context.globalCompositeOperation = "screen";
-    for (let i = 0; i < Math.min(450, width * 0.34); i += 1) {
+    for (let i = 0; i < Math.min(280, width * 0.22); i += 1) {
       const x = randomBetween(-diagonal / 2, diagonal / 2, seededRandom);
       const normal = (seededRandom() + seededRandom() + seededRandom() - 1.5) / 1.5;
-      const y = normal * height * 0.18;
+      const y = normal * height * 0.15;
       const radius = randomBetween(0.18, 0.7, seededRandom);
-      const alpha = randomBetween(0.025, 0.11, seededRandom) * (1 - Math.abs(normal) * 0.7);
+      const alpha = randomBetween(0.018, 0.075, seededRandom) * (1 - Math.abs(normal) * 0.7);
       context.fillStyle = `rgba(211, 218, 216, ${alpha})`;
       context.beginPath();
       context.arc(x, y, radius, 0, TAU);
@@ -286,20 +352,24 @@
   function paintForeground(context) {
     context.clearRect(0, 0, width, height);
 
-    const horizonGlow = context.createLinearGradient(0, height * 0.77, 0, height);
-    horizonGlow.addColorStop(0, "rgba(19, 36, 45, 0)");
-    horizonGlow.addColorStop(0.78, "rgba(18, 32, 38, 0.19)");
-    horizonGlow.addColorStop(1, "rgba(4, 9, 13, 0.48)");
-    context.fillStyle = horizonGlow;
-    context.fillRect(0, height * 0.72, width, height * 0.28);
+    if (skyPhotoLoaded) return;
 
-    const baseY = height * 0.94;
-    paintTreeLine(context, baseY, "rgba(5, 12, 17, 0.72)", 0.72, 11);
-    paintTreeLine(context, height * 0.98, "rgba(1, 5, 8, 0.97)", 1, 29);
+    const horizonGlow = context.createLinearGradient(0, height * 0.72, 0, height);
+    horizonGlow.addColorStop(0, "rgba(19, 36, 45, 0)");
+    horizonGlow.addColorStop(0.78, "rgba(18, 32, 38, 0.15)");
+    horizonGlow.addColorStop(1, "rgba(4, 9, 13, 0.36)");
+    context.fillStyle = horizonGlow;
+    context.fillRect(0, height * 0.7, width, height * 0.3);
+
+    // A soft ridge behind the trees breaks the perfectly flat, game-like horizon.
+    paintRidge(context, height * 0.925, "rgba(8, 19, 25, 0.54)", 0.025, 7);
+    paintForestMass(context, height * 0.952, "rgba(3, 11, 16, 0.78)", 0.064, 17);
+    paintForestMass(context, height * 0.984, "rgba(1, 5, 8, 0.98)", 0.105, 31);
+    paintNearSpruces(context, 43);
 
     const earth = context.createLinearGradient(0, height * 0.91, 0, height);
     earth.addColorStop(0, "rgba(1, 5, 8, 0)");
-    earth.addColorStop(0.52, "rgba(1, 4, 6, 0.92)");
+    earth.addColorStop(0.52, "rgba(1, 4, 6, 0.88)");
     earth.addColorStop(1, "#010305");
     context.fillStyle = earth;
     context.beginPath();
@@ -312,43 +382,87 @@
     context.fill();
   }
 
-  function paintTreeLine(context, baseY, color, scale, seedOffset) {
-    const random = mulberry32(Math.round(width + height + seedOffset * 101));
+  function paintRidge(context, baseY, color, amplitude, seedOffset) {
+    const random = mulberry32(Math.round(width * 3 + height * 5 + seedOffset * 101));
     context.fillStyle = color;
-    const edgeAllowance = Math.max(0, 1 - width / 1300);
-    let x = randomBetween(-28, -8, random);
+    context.beginPath();
+    context.moveTo(-8, height);
+    context.lineTo(-8, baseY);
+    let x = -8;
+    let y = baseY;
+    while (x < width + 16) {
+      const step = randomBetween(24, 60, random);
+      const contour = Math.sin(x * 0.006 + seedOffset) * height * amplitude * 0.38;
+      y = baseY - height * amplitude * randomBetween(0.18, 0.72, random) + contour;
+      context.quadraticCurveTo(x + step * 0.45, y + randomBetween(-5, 5, random), x + step, y);
+      x += step;
+    }
+    context.lineTo(width + 8, height);
+    context.closePath();
+    context.fill();
+  }
 
-    while (x < width + 35) {
+  function paintForestMass(context, baseY, color, heightRatio, seedOffset) {
+    const random = mulberry32(Math.round(width * 7 + height * 11 + seedOffset * 101));
+    const baseHeight = height * heightRatio;
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(-6, height);
+    context.lineTo(-6, baseY);
+    let x = -6;
+    while (x < width + 12) {
+      const treeHeight = baseHeight * randomBetween(0.3, 1, random);
+      const treeWidth = treeHeight * randomBetween(0.18, 0.42, random);
+      const crownY = baseY - treeHeight;
+      context.lineTo(x + treeWidth * 0.3, baseY - treeHeight * 0.28);
+      context.quadraticCurveTo(x + treeWidth * 0.08, crownY + treeHeight * 0.11, x + treeWidth * 0.52, crownY);
+      context.quadraticCurveTo(x + treeWidth * 0.9, crownY + treeHeight * 0.32, x + treeWidth, baseY - treeHeight * 0.42);
+      context.lineTo(x + treeWidth * 1.35, baseY);
+      x += treeWidth * randomBetween(0.72, 1.05, random);
+    }
+    context.lineTo(width + 10, height);
+    context.closePath();
+    context.fill();
+  }
+
+  function paintNearSpruces(context, seedOffset) {
+    const random = mulberry32(Math.round(width * 13 + height * 17 + seedOffset * 101));
+    const baseY = height * 0.99;
+    const trees = Math.round(clamp(width / 95, 8, 19));
+
+    for (let i = 0; i < trees; i += 1) {
+      const x = ((i + randomBetween(-0.36, 0.36, random)) / (trees - 1)) * width;
       const edge = Math.abs(x / width - 0.5) * 2;
-      const naturalHeight = randomBetween(25, 72, random) * scale;
-      const treeHeight = naturalHeight * (0.72 + edge * (0.7 + edgeAllowance));
-      const treeWidth = treeHeight * randomBetween(0.34, 0.55, random);
-      paintPine(context, x, baseY + randomBetween(-4, 6, random), treeWidth, treeHeight, random);
-      x += randomBetween(24, 57, random) * scale;
+      const treeHeight = height * randomBetween(0.045, 0.125, random) * (0.8 + edge * 0.42);
+      const treeWidth = treeHeight * randomBetween(0.26, 0.44, random);
+      paintSpruce(context, x, baseY + randomBetween(-2, 3, random), treeWidth, treeHeight, random);
     }
   }
 
-  function paintPine(context, x, baseY, treeWidth, treeHeight, random) {
+  function paintSpruce(context, x, baseY, treeWidth, treeHeight, random) {
+    context.fillStyle = "rgba(1, 5, 8, 0.96)";
     context.beginPath();
-    context.moveTo(x, baseY - treeHeight);
-    const layers = 7 + Math.floor(random() * 3);
-    for (let layer = 1; layer <= layers; layer += 1) {
-      const progress = layer / layers;
-      const y = baseY - treeHeight + treeHeight * progress + randomBetween(-1.4, 1.4, random);
-      const halfWidth = treeWidth * Math.pow(progress, 0.82) * randomBetween(0.7, 1.12, random);
-      context.lineTo(x - halfWidth, y);
-      context.lineTo(x - halfWidth * randomBetween(0.18, 0.36, random), y - treeHeight * randomBetween(0.045, 0.085, random));
-    }
-    context.lineTo(x - treeWidth * 0.08, baseY);
-    context.lineTo(x + treeWidth * 0.08, baseY);
-    for (let layer = layers; layer >= 1; layer -= 1) {
-      const progress = layer / layers;
-      const y = baseY - treeHeight + treeHeight * progress + randomBetween(-1.4, 1.4, random);
-      const halfWidth = treeWidth * Math.pow(progress, 0.82) * randomBetween(0.7, 1.12, random);
-      context.lineTo(x + halfWidth * randomBetween(0.18, 0.36, random), y - treeHeight * randomBetween(0.045, 0.085, random));
-      context.lineTo(x + halfWidth, y);
-    }
+    context.moveTo(x - treeWidth * 0.06, baseY);
+    context.lineTo(x - treeWidth * 0.035, baseY - treeHeight * 0.3);
+    context.lineTo(x, baseY - treeHeight);
+    context.lineTo(x + treeWidth * 0.04, baseY - treeHeight * 0.31);
+    context.lineTo(x + treeWidth * 0.075, baseY);
     context.closePath();
+    context.fill();
+
+    const layers = 6 + Math.floor(random() * 4);
+    context.beginPath();
+    for (let layer = 0; layer < layers; layer += 1) {
+      const progress = (layer + 0.72) / layers;
+      const y = baseY - treeHeight + treeHeight * progress;
+      const halfWidth = treeWidth * Math.pow(progress, 0.78) * randomBetween(0.62, 1.08, random);
+      const droop = treeHeight * randomBetween(0.028, 0.07, random);
+      context.moveTo(x, y - treeHeight * 0.055);
+      context.quadraticCurveTo(x - halfWidth * 0.25, y, x - halfWidth, y + droop);
+      context.quadraticCurveTo(x - halfWidth * 0.32, y + droop * 0.75, x, y + droop * 0.38);
+      context.quadraticCurveTo(x + halfWidth * 0.3, y + droop * 0.75, x + halfWidth, y + droop);
+      context.quadraticCurveTo(x + halfWidth * 0.24, y, x, y - treeHeight * 0.055);
+    }
     context.fill();
   }
 
@@ -383,13 +497,15 @@
     const directionY = Math.sin(angle);
     const distanceFromRadiant = Math.hypot(x - radiant.x, y - radiant.y);
     const perspective = clamp(distanceFromRadiant / (diagonal * 0.48), 0.18, 1);
-    const fireball = intentional || Math.random() < 0.055;
-    const pathLength = randomBetween(105, fireball ? 430 : 300) * lerp(0.48, 1.08, perspective);
-    const speed = randomBetween(fireball ? 760 : 940, fireball ? 1180 : 1680);
+    // The majority of naked-eye meteors are small, brief, and almost colourless. Their
+    // rarity is part of the atmosphere: one clean streak is more believable than a barrage.
+    const fireball = intentional ? Math.random() < 0.012 : Math.random() < 0.003;
+    const pathLength = randomBetween(86, fireball ? 220 : 158) * lerp(0.62, 1, perspective);
+    const speed = randomBetween(fireball ? 360 : 250, fireball ? 560 : 430);
     const travelDuration = pathLength / speed;
-    const trailLength = pathLength * randomBetween(fireball ? 0.36 : 0.18, fireball ? 0.58 : 0.38);
+    const trailLength = pathLength * randomBetween(fireball ? 0.43 : 0.33, fireball ? 0.58 : 0.46);
     const hue = Math.random();
-    const color = hue < 0.2 ? [201, 222, 233] : hue > 0.82 ? [255, 224, 182] : [247, 242, 225];
+    const color = hue < 0.07 ? [205, 218, 220] : hue > 0.94 ? [238, 224, 203] : [232, 235, 229];
 
     meteors.push({
       x,
@@ -398,17 +514,15 @@
       directionY,
       pathLength,
       trailLength,
+      speed,
       travelDuration,
-      totalDuration: travelDuration + (fireball ? 0.68 : 0.24),
+      totalDuration: travelDuration + (fireball ? 0.08 : 0.035),
       age: 0,
-      width: randomBetween(fireball ? 1.05 : 0.38, fireball ? 1.72 : 0.88),
-      brightness: randomBetween(fireball ? 0.92 : 0.48, 1),
+      width: randomBetween(fireball ? 0.6 : 0.25, fireball ? 0.92 : 0.46),
+      brightness: randomBetween(fireball ? 0.72 : 0.46, fireball ? 0.92 : 0.76),
       fireball,
       color,
-      seed: Math.random() * TAU,
-      flareAt: randomBetween(0.36, 0.76),
-      texture: Array.from({ length: 20 }, () => randomBetween(0.72, 1.08)),
-      fragments: fireball && Math.random() < 0.48,
+      flareAt: randomBetween(0.42, 0.72),
     });
 
     meteorCount += 1;
@@ -416,23 +530,23 @@
   }
 
   function scheduleNextMeteor(now) {
-    // A capped exponential arrival time creates natural lulls and close pairs.
-    const wait = clamp((-Math.log(1 - Math.random()) / 0.38) * 1000, 1200, 5600);
+    // Even on a good Perseid night, most of the time is spent waiting and looking.
+    const wait = clamp((-Math.log(1 - Math.random()) / 0.035) * 1000, 14000, 96000);
     nextMeteorAt = now + wait;
   }
 
   function prepareCaptureMeteors() {
     meteorCount = 0;
-    createMeteor({ x: width * 0.42, y: height * 0.44 }, true);
-    const fireball = meteors[meteors.length - 1];
-    fireball.age = fireball.travelDuration * 0.48;
-
-    createMeteor({ x: width * 0.78, y: height * 0.43 });
-    const faintMeteor = meteors[meteors.length - 1];
-    faintMeteor.fireball = false;
-    faintMeteor.width = 0.64;
-    faintMeteor.brightness = 0.58;
-    faintMeteor.age = faintMeteor.travelDuration * 0.38;
+    createMeteor({ x: width * 0.37, y: height * 0.4 });
+    const sampleMeteor = meteors[meteors.length - 1];
+    sampleMeteor.fireball = false;
+    sampleMeteor.pathLength = clamp(width * 0.16, 90, 190);
+    sampleMeteor.trailLength = sampleMeteor.pathLength * 0.4;
+    sampleMeteor.travelDuration = sampleMeteor.pathLength / sampleMeteor.speed;
+    sampleMeteor.totalDuration = sampleMeteor.travelDuration + 0.035;
+    sampleMeteor.width = 0.42;
+    sampleMeteor.brightness = 0.72;
+    sampleMeteor.age = sampleMeteor.travelDuration * 0.82;
   }
 
   function updateCount() {
@@ -448,11 +562,6 @@
 
     if (!paused && !reduceMotionQuery.matches && now >= nextMeteorAt) {
       createMeteor();
-      if (Math.random() < 0.12) {
-        window.setTimeout(() => {
-          if (!paused && !document.hidden) createMeteor();
-        }, randomBetween(100, 420));
-      }
       scheduleNextMeteor(now);
     }
 
@@ -488,7 +597,6 @@
     ctx.drawImage(backgroundCanvas, offsetX - 3, offsetY - 3, width + 6, height + 6);
     drawTwinklingStars(now, offsetX, offsetY);
     if (reduceMotionQuery.matches && !captureMode) drawReducedMotionMeteor();
-    drawFireballLight();
     drawSatellite();
 
     for (const meteor of meteors) drawMeteor(meteor);
@@ -529,22 +637,6 @@
     }
   }
 
-  function drawFireballLight() {
-    for (const meteor of meteors) {
-      if (!meteor.fireball) continue;
-      const travelProgress = clamp(meteor.age / meteor.travelDuration, 0, 1);
-      const lifeFade = 1 - clamp((meteor.age - meteor.travelDuration * 0.7) / (meteor.totalDuration - meteor.travelDuration * 0.7), 0, 1);
-      const headX = meteor.x + meteor.directionX * meteor.pathLength * travelProgress;
-      const headY = meteor.y + meteor.directionY * meteor.pathLength * travelProgress;
-      const flash = ctx.createRadialGradient(headX, headY, 0, headX, headY, Math.min(width, height) * 0.27);
-      flash.addColorStop(0, `rgba(191, 211, 219, ${0.035 * lifeFade})`);
-      flash.addColorStop(0.3, `rgba(106, 137, 153, ${0.014 * lifeFade})`);
-      flash.addColorStop(1, "rgba(25, 42, 54, 0)");
-      ctx.fillStyle = flash;
-      ctx.fillRect(0, 0, width, height);
-    }
-  }
-
   function drawSatellite() {
     if (!satellite) return;
     ctx.save();
@@ -562,11 +654,11 @@
     const afterlife = clamp((meteor.age - meteor.travelDuration) / (meteor.totalDuration - meteor.travelDuration), 0, 1);
     const ignition = smoothstep(0, 0.065, travelProgress);
     const trailFade = afterlife > 0 ? 1 - smoothstep(0, 1, afterlife) : ignition;
-    const headFade = afterlife > 0 ? 0 : ignition * (1 - smoothstep(0.86, 1, travelProgress) * 0.38);
-    const flareDistance = (travelProgress - meteor.flareAt) / (meteor.fireball ? 0.075 : 0.1);
-    const flare = Math.exp(-(flareDistance * flareDistance));
-    const luminance = meteor.brightness * (1 + flare * (meteor.fireball ? 0.72 : 0.18));
-    // Meteors retain nearly constant apparent speed; cinematic easing reads as artificial.
+    const headFade = afterlife > 0 ? 0 : ignition * (1 - smoothstep(0.9, 1, travelProgress) * 0.2);
+    const flareDistance = (travelProgress - meteor.flareAt) / 0.12;
+    const flare = meteor.fireball ? Math.exp(-(flareDistance * flareDistance)) : 0;
+    const luminance = meteor.brightness * (1 + flare * 0.26);
+    // A meteor is a moving point with a short, fading wake — not a glowing laser line.
     const headDistance = meteor.pathLength * travelProgress;
     const currentTrail = Math.min(meteor.trailLength, headDistance * 0.97) * (1 - afterlife * 0.18);
     const headX = meteor.x + meteor.directionX * headDistance;
@@ -577,80 +669,42 @@
 
     ctx.save();
     ctx.lineCap = "round";
-    ctx.globalCompositeOperation = "screen";
+    ctx.globalCompositeOperation = "lighter";
 
-    const glowGradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
-    glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
-    glowGradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, ${0.035 * luminance * trailFade})`);
-    glowGradient.addColorStop(1, `rgba(255, 247, 226, ${0.2 * luminance * trailFade})`);
-    ctx.strokeStyle = glowGradient;
-    ctx.lineWidth = meteor.width * (meteor.fireball ? 4.4 : 3.1);
-    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.2 * trailFade})`;
-    ctx.shadowBlur = meteor.fireball ? 9 : 4;
+    // First lay down a nearly invisible, out-of-focus wake. It avoids the hard digital
+    // edge that makes a canvas-drawn streak read as a graphic.
+    const halo = ctx.createLinearGradient(tailX, tailY, headX, headY);
+    halo.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+    halo.addColorStop(0.72, `rgba(${r}, ${g}, ${b}, ${0.02 * luminance * trailFade})`);
+    halo.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${0.09 * luminance * trailFade})`);
+    ctx.strokeStyle = halo;
+    ctx.lineWidth = meteor.width * (meteor.fireball ? 3 : 2.1);
     ctx.beginPath();
     ctx.moveTo(tailX, tailY);
     ctx.lineTo(headX, headY);
     ctx.stroke();
 
-    // Short, tapered sections preserve tiny intensity changes seen in real ionized trails.
-    const segmentCount = 18;
+    const core = ctx.createLinearGradient(tailX, tailY, headX, headY);
+    core.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+    core.addColorStop(0.42, `rgba(${r}, ${g}, ${b}, ${0.015 * luminance * trailFade})`);
+    core.addColorStop(0.83, `rgba(${r}, ${g}, ${b}, ${0.32 * luminance * trailFade})`);
+    core.addColorStop(1, `rgba(250, 246, 231, ${0.72 * luminance * trailFade})`);
+    ctx.strokeStyle = core;
+    ctx.lineWidth = Math.max(0.28, meteor.width);
     ctx.shadowBlur = 0;
-    for (let segment = 0; segment < segmentCount; segment += 1) {
-      const start = segment / segmentCount;
-      const end = Math.min(1, (segment + 1.06) / segmentCount);
-      const texture = meteor.texture[segment % meteor.texture.length];
-      const alpha = Math.min(1, Math.pow(end, 2.15) * 0.72 * luminance * trailFade * texture);
-      const nearHead = smoothstep(0.78, 1, end);
-      const red = Math.round(lerp(r, 255, nearHead * 0.72));
-      const green = Math.round(lerp(g, 249, nearHead * 0.7));
-      const blue = Math.round(lerp(b, 232, nearHead * 0.45));
-      ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-      ctx.lineWidth = Math.max(0.22, meteor.width * (0.16 + Math.pow(end, 1.45) * 0.84));
-      ctx.beginPath();
-      ctx.moveTo(lerp(tailX, headX, start), lerp(tailY, headY, start));
-      ctx.lineTo(lerp(tailX, headX, end), lerp(tailY, headY, end));
-      ctx.stroke();
-    }
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(headX, headY);
+    ctx.stroke();
 
-    if (meteor.fireball && headFade > 0) {
-      const coreRadius = (3.8 + flare * 1.8) * headFade;
-      const core = ctx.createRadialGradient(headX, headY, 0, headX, headY, coreRadius);
-      core.addColorStop(0, `rgba(255, 252, 238, ${Math.min(1, headFade * luminance)})`);
-      core.addColorStop(0.22, `rgba(255, 220, 175, ${0.58 * headFade})`);
-      core.addColorStop(1, "rgba(190, 218, 228, 0)");
-      ctx.fillStyle = core;
+    if (headFade > 0) {
+      ctx.fillStyle = `rgba(255, 249, 232, ${0.62 * headFade * luminance})`;
       ctx.beginPath();
-      ctx.arc(headX, headY, coreRadius, 0, TAU);
+      ctx.arc(headX, headY, Math.max(0.28, meteor.width * (meteor.fireball ? 0.85 : 0.52)), 0, TAU);
       ctx.fill();
-    } else if (headFade > 0) {
-      ctx.fillStyle = `rgba(255, 251, 236, ${0.86 * headFade * luminance})`;
-      ctx.beginPath();
-      ctx.arc(headX, headY, Math.max(0.34, meteor.width * 0.52), 0, TAU);
-      ctx.fill();
-    }
-
-    if (meteor.fragments && travelProgress > 0.58) {
-      drawFragments(meteor, headX, headY, currentTrail, trailFade, r, g, b);
     }
 
     ctx.restore();
-  }
-
-  function drawFragments(meteor, headX, headY, trailLength, fade, r, g, b) {
-    const perpendicularX = -meteor.directionY;
-    const perpendicularY = meteor.directionX;
-    for (let i = 0; i < 3; i += 1) {
-      const separation = (i - 1) * 3.2 * clamp((meteor.age - meteor.travelDuration * 0.5) * 3, 0, 1);
-      const fragmentLength = trailLength * (0.14 + i * 0.055);
-      const fragmentHeadX = headX - meteor.directionX * (9 + i * 8) + perpendicularX * separation;
-      const fragmentHeadY = headY - meteor.directionY * (9 + i * 8) + perpendicularY * separation;
-      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.28 * fade})`;
-      ctx.lineWidth = 0.45;
-      ctx.beginPath();
-      ctx.moveTo(fragmentHeadX - meteor.directionX * fragmentLength, fragmentHeadY - meteor.directionY * fragmentLength);
-      ctx.lineTo(fragmentHeadX, fragmentHeadY);
-      ctx.stroke();
-    }
   }
 
   function animationFrame(now) {
@@ -691,6 +745,15 @@
       scheduleNextMeteor(lastFrame);
       animationRequest = window.requestAnimationFrame(animationFrame);
     }
+  }
+
+  function selectScene(event) {
+    const scene = event.currentTarget.dataset.scene;
+    if (!scene || !scenes[scene] || scene === activeScene) return;
+
+    activeScene = scene;
+    sceneButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.scene === scene)));
+    skyPhoto.src = scenes[scene].source;
   }
 
   class Soundscape {
@@ -806,6 +869,16 @@
       animationRequest = window.requestAnimationFrame(animationFrame);
     }
   });
+
+  skyPhoto.addEventListener("load", () => {
+    skyPhotoLoaded = true;
+    resize();
+  });
+  sceneButtons.forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.scene === activeScene));
+    button.addEventListener("click", selectScene);
+  });
+  skyPhoto.src = scenes[activeScene].source;
 
   window.setTimeout(() => intro.classList.add("is-resting"), 6800);
   window.setTimeout(() => hint.classList.add("is-hidden"), 12000);

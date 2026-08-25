@@ -33,7 +33,6 @@
           </svg>
           <span>NOCTURNE</span>
         </a>
-        <p class="site-kicker">A dark-sky study</p>
       </header>
 
       <section class="intro" aria-labelledby="intro-title">
@@ -43,9 +42,18 @@
       </section>
 
       <p class="interaction-hint" id="interaction-hint">
-        <span class="hint-mark" aria-hidden="true">✦</span>
-        Touch the sky to make a wish
+        <span class="hint-mark" aria-hidden="true"></span>
+        Tap the sky to trace a meteor
       </p>
+
+      <section class="scene-picker" aria-label="Choose a sky scene">
+        <p>Scene</p>
+        <div>
+          <button type="button" data-scene="open-sky" aria-pressed="true">Open sky</button>
+          <button type="button" data-scene="distant-butte" aria-pressed="false">Low horizon</button>
+          <button type="button" data-scene="desert-tree" aria-pressed="false">Desert tree</button>
+        </div>
+      </section>
 
       <section class="controls" id="controls" aria-label="Sky controls">
         <div class="observation" aria-live="polite">
@@ -72,8 +80,6 @@
         </div>
       </section>
 
-      <div class="edge-mark edge-mark--left" aria-hidden="true">N&nbsp;&nbsp;42°</div>
-      <div class="edge-mark edge-mark--right" aria-hidden="true">∞</div>
       <p class="sr-only" id="motion-description">
         Meteors appear at irregular intervals and travel outward from a shared radiant point.
       </p>
