@@ -26,17 +26,19 @@
   const scenes = {
     "open-sky": {
       source: "./assets/open-sky-nps.jpg",
-      filter: "brightness(0.6) saturate(0.5) contrast(0.94)",
+      // This is an astrophotograph, so keep its natural colour and exposure intact.
+      // A light reduction keeps the type legible without turning the sky into a blue wash.
+      filter: "brightness(0.82) saturate(0.82) contrast(0.98)",
       mobileAnchor: "center",
     },
     "distant-butte": {
       source: "./assets/distant-butte-nps.jpg",
-      filter: "brightness(0.46) saturate(0.35) contrast(0.96)",
+      filter: "brightness(0.68) saturate(0.68) contrast(0.98)",
       mobileAnchor: "center",
     },
     "desert-tree": {
       source: "./assets/nocturne-sky-nasa.jpg",
-      filter: "brightness(0.63) saturate(0.58) contrast(0.94)",
+      filter: "brightness(0.78) saturate(0.76) contrast(0.98)",
       mobileAnchor: "left",
     },
   };
@@ -45,7 +47,7 @@
   let height = 0;
   let dpr = 1;
   let lastFrame = performance.now();
-  let nextMeteorAt = lastFrame + 4200 + Math.random() * 3400;
+  let nextMeteorAt = lastFrame + 18000 + Math.random() * 22000;
   let meteorCount = 0;
   let paused = reduceMotionQuery.matches;
   let pointerX = 0;
@@ -495,15 +497,15 @@
     const directionY = Math.sin(angle);
     const distanceFromRadiant = Math.hypot(x - radiant.x, y - radiant.y);
     const perspective = clamp(distanceFromRadiant / (diagonal * 0.48), 0.18, 1);
-    // Most visible meteors are quick, pencil-thin streaks. Bright fireballs are memorable
-    // precisely because they are unusual, so keep them exceptional even on interaction.
-    const fireball = intentional ? Math.random() < 0.06 : Math.random() < 0.012;
-    const pathLength = randomBetween(120, fireball ? 280 : 220) * lerp(0.62, 1.04, perspective);
-    const speed = randomBetween(fireball ? 620 : 570, fireball ? 920 : 920);
+    // The majority of naked-eye meteors are small, brief, and almost colourless. Their
+    // rarity is part of the atmosphere: one clean streak is more believable than a barrage.
+    const fireball = intentional ? Math.random() < 0.012 : Math.random() < 0.003;
+    const pathLength = randomBetween(86, fireball ? 220 : 158) * lerp(0.62, 1, perspective);
+    const speed = randomBetween(fireball ? 360 : 250, fireball ? 560 : 430);
     const travelDuration = pathLength / speed;
-    const trailLength = pathLength * randomBetween(fireball ? 0.36 : 0.34, fireball ? 0.52 : 0.5);
+    const trailLength = pathLength * randomBetween(fireball ? 0.43 : 0.33, fireball ? 0.58 : 0.46);
     const hue = Math.random();
-    const color = hue < 0.12 ? [207, 224, 222] : hue > 0.9 ? [244, 229, 201] : [239, 239, 228];
+    const color = hue < 0.07 ? [205, 218, 220] : hue > 0.94 ? [238, 224, 203] : [232, 235, 229];
 
     meteors.push({
       x,
@@ -514,16 +516,13 @@
       trailLength,
       speed,
       travelDuration,
-      totalDuration: travelDuration + (fireball ? 0.32 : 0.14),
+      totalDuration: travelDuration + (fireball ? 0.08 : 0.035),
       age: 0,
-      width: randomBetween(fireball ? 0.82 : 0.28, fireball ? 1.2 : 0.56),
-      brightness: randomBetween(fireball ? 0.7 : 0.5, fireball ? 0.94 : 0.82),
+      width: randomBetween(fireball ? 0.6 : 0.25, fireball ? 0.92 : 0.46),
+      brightness: randomBetween(fireball ? 0.72 : 0.46, fireball ? 0.92 : 0.76),
       fireball,
       color,
-      seed: Math.random() * TAU,
-      flareAt: randomBetween(0.36, 0.76),
-      texture: Array.from({ length: 12 }, () => randomBetween(0.76, 1.04)),
-      fragments: fireball && Math.random() < 0.16,
+      flareAt: randomBetween(0.42, 0.72),
     });
 
     meteorCount += 1;
@@ -531,8 +530,8 @@
   }
 
   function scheduleNextMeteor(now) {
-    // Perseid viewing has long, quiet gaps. A shower should never feel like a screensaver.
-    const wait = clamp((-Math.log(1 - Math.random()) / 0.115) * 1000, 3800, 26000);
+    // Even on a good Perseid night, most of the time is spent waiting and looking.
+    const wait = clamp((-Math.log(1 - Math.random()) / 0.035) * 1000, 14000, 96000);
     nextMeteorAt = now + wait;
   }
 
@@ -542,11 +541,11 @@
     const sampleMeteor = meteors[meteors.length - 1];
     sampleMeteor.fireball = false;
     sampleMeteor.pathLength = clamp(width * 0.16, 90, 190);
-    sampleMeteor.trailLength = sampleMeteor.pathLength * 0.48;
+    sampleMeteor.trailLength = sampleMeteor.pathLength * 0.4;
     sampleMeteor.travelDuration = sampleMeteor.pathLength / sampleMeteor.speed;
-    sampleMeteor.totalDuration = sampleMeteor.travelDuration + 0.14;
-    sampleMeteor.width = 0.62;
-    sampleMeteor.brightness = 0.82;
+    sampleMeteor.totalDuration = sampleMeteor.travelDuration + 0.035;
+    sampleMeteor.width = 0.42;
+    sampleMeteor.brightness = 0.72;
     sampleMeteor.age = sampleMeteor.travelDuration * 0.82;
   }
 
@@ -563,11 +562,6 @@
 
     if (!paused && !reduceMotionQuery.matches && now >= nextMeteorAt) {
       createMeteor();
-      if (Math.random() < 0.12) {
-        window.setTimeout(() => {
-          if (!paused && !document.hidden) createMeteor();
-        }, randomBetween(100, 420));
-      }
       scheduleNextMeteor(now);
     }
 
@@ -603,7 +597,6 @@
     ctx.drawImage(backgroundCanvas, offsetX - 3, offsetY - 3, width + 6, height + 6);
     drawTwinklingStars(now, offsetX, offsetY);
     if (reduceMotionQuery.matches && !captureMode) drawReducedMotionMeteor();
-    drawFireballLight();
     drawSatellite();
 
     for (const meteor of meteors) drawMeteor(meteor);
@@ -644,22 +637,6 @@
     }
   }
 
-  function drawFireballLight() {
-    for (const meteor of meteors) {
-      if (!meteor.fireball) continue;
-      const travelProgress = clamp(meteor.age / meteor.travelDuration, 0, 1);
-      const lifeFade = 1 - clamp((meteor.age - meteor.travelDuration * 0.7) / (meteor.totalDuration - meteor.travelDuration * 0.7), 0, 1);
-      const headX = meteor.x + meteor.directionX * meteor.pathLength * travelProgress;
-      const headY = meteor.y + meteor.directionY * meteor.pathLength * travelProgress;
-      const flash = ctx.createRadialGradient(headX, headY, 0, headX, headY, Math.min(width, height) * 0.27);
-      flash.addColorStop(0, `rgba(191, 211, 219, ${0.016 * lifeFade})`);
-      flash.addColorStop(0.3, `rgba(106, 137, 153, ${0.008 * lifeFade})`);
-      flash.addColorStop(1, "rgba(25, 42, 54, 0)");
-      ctx.fillStyle = flash;
-      ctx.fillRect(0, 0, width, height);
-    }
-  }
-
   function drawSatellite() {
     if (!satellite) return;
     ctx.save();
@@ -677,11 +654,11 @@
     const afterlife = clamp((meteor.age - meteor.travelDuration) / (meteor.totalDuration - meteor.travelDuration), 0, 1);
     const ignition = smoothstep(0, 0.065, travelProgress);
     const trailFade = afterlife > 0 ? 1 - smoothstep(0, 1, afterlife) : ignition;
-    const headFade = afterlife > 0 ? 0 : ignition * (1 - smoothstep(0.86, 1, travelProgress) * 0.38);
-    const flareDistance = (travelProgress - meteor.flareAt) / (meteor.fireball ? 0.075 : 0.1);
-    const flare = Math.exp(-(flareDistance * flareDistance));
-    const luminance = meteor.brightness * (1 + flare * (meteor.fireball ? 0.72 : 0.18));
-    // Meteors retain nearly constant apparent speed; cinematic easing reads as artificial.
+    const headFade = afterlife > 0 ? 0 : ignition * (1 - smoothstep(0.9, 1, travelProgress) * 0.2);
+    const flareDistance = (travelProgress - meteor.flareAt) / 0.12;
+    const flare = meteor.fireball ? Math.exp(-(flareDistance * flareDistance)) : 0;
+    const luminance = meteor.brightness * (1 + flare * 0.26);
+    // A meteor is a moving point with a short, fading wake — not a glowing laser line.
     const headDistance = meteor.pathLength * travelProgress;
     const currentTrail = Math.min(meteor.trailLength, headDistance * 0.97) * (1 - afterlife * 0.18);
     const headX = meteor.x + meteor.directionX * headDistance;
@@ -692,80 +669,42 @@
 
     ctx.save();
     ctx.lineCap = "round";
-    ctx.globalCompositeOperation = "screen";
+    ctx.globalCompositeOperation = "lighter";
 
-    const glowGradient = ctx.createLinearGradient(tailX, tailY, headX, headY);
-    glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
-    glowGradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, ${0.035 * luminance * trailFade})`);
-    glowGradient.addColorStop(1, `rgba(255, 247, 226, ${0.2 * luminance * trailFade})`);
-    ctx.strokeStyle = glowGradient;
-    ctx.lineWidth = meteor.width * (meteor.fireball ? 3.1 : 2.1);
-    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.12 * trailFade})`;
-    ctx.shadowBlur = meteor.fireball ? 6 : 2;
+    // First lay down a nearly invisible, out-of-focus wake. It avoids the hard digital
+    // edge that makes a canvas-drawn streak read as a graphic.
+    const halo = ctx.createLinearGradient(tailX, tailY, headX, headY);
+    halo.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+    halo.addColorStop(0.72, `rgba(${r}, ${g}, ${b}, ${0.02 * luminance * trailFade})`);
+    halo.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${0.09 * luminance * trailFade})`);
+    ctx.strokeStyle = halo;
+    ctx.lineWidth = meteor.width * (meteor.fireball ? 3 : 2.1);
     ctx.beginPath();
     ctx.moveTo(tailX, tailY);
     ctx.lineTo(headX, headY);
     ctx.stroke();
 
-    // Short, tapered sections preserve tiny intensity changes seen in real ionized trails.
-    const segmentCount = 12;
+    const core = ctx.createLinearGradient(tailX, tailY, headX, headY);
+    core.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+    core.addColorStop(0.42, `rgba(${r}, ${g}, ${b}, ${0.015 * luminance * trailFade})`);
+    core.addColorStop(0.83, `rgba(${r}, ${g}, ${b}, ${0.32 * luminance * trailFade})`);
+    core.addColorStop(1, `rgba(250, 246, 231, ${0.72 * luminance * trailFade})`);
+    ctx.strokeStyle = core;
+    ctx.lineWidth = Math.max(0.28, meteor.width);
     ctx.shadowBlur = 0;
-    for (let segment = 0; segment < segmentCount; segment += 1) {
-      const start = segment / segmentCount;
-      const end = Math.min(1, (segment + 1.06) / segmentCount);
-      const texture = meteor.texture[segment % meteor.texture.length];
-      const alpha = Math.min(1, Math.pow(end, 2.35) * 0.66 * luminance * trailFade * texture);
-      const nearHead = smoothstep(0.78, 1, end);
-      const red = Math.round(lerp(r, 255, nearHead * 0.72));
-      const green = Math.round(lerp(g, 249, nearHead * 0.7));
-      const blue = Math.round(lerp(b, 232, nearHead * 0.45));
-      ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-      ctx.lineWidth = Math.max(0.28, meteor.width * (0.14 + Math.pow(end, 1.55) * 0.76));
-      ctx.beginPath();
-      ctx.moveTo(lerp(tailX, headX, start), lerp(tailY, headY, start));
-      ctx.lineTo(lerp(tailX, headX, end), lerp(tailY, headY, end));
-      ctx.stroke();
-    }
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(headX, headY);
+    ctx.stroke();
 
-    if (meteor.fireball && headFade > 0) {
-      const coreRadius = (2.25 + flare * 1.2) * headFade;
-      const core = ctx.createRadialGradient(headX, headY, 0, headX, headY, coreRadius);
-      core.addColorStop(0, `rgba(255, 252, 238, ${Math.min(1, headFade * luminance)})`);
-      core.addColorStop(0.22, `rgba(255, 220, 175, ${0.58 * headFade})`);
-      core.addColorStop(1, "rgba(190, 218, 228, 0)");
-      ctx.fillStyle = core;
+    if (headFade > 0) {
+      ctx.fillStyle = `rgba(255, 249, 232, ${0.62 * headFade * luminance})`;
       ctx.beginPath();
-      ctx.arc(headX, headY, coreRadius, 0, TAU);
+      ctx.arc(headX, headY, Math.max(0.28, meteor.width * (meteor.fireball ? 0.85 : 0.52)), 0, TAU);
       ctx.fill();
-    } else if (headFade > 0) {
-      ctx.fillStyle = `rgba(255, 251, 236, ${0.72 * headFade * luminance})`;
-      ctx.beginPath();
-      ctx.arc(headX, headY, Math.max(0.28, meteor.width * 0.42), 0, TAU);
-      ctx.fill();
-    }
-
-    if (meteor.fragments && travelProgress > 0.58) {
-      drawFragments(meteor, headX, headY, currentTrail, trailFade, r, g, b);
     }
 
     ctx.restore();
-  }
-
-  function drawFragments(meteor, headX, headY, trailLength, fade, r, g, b) {
-    const perpendicularX = -meteor.directionY;
-    const perpendicularY = meteor.directionX;
-    for (let i = 0; i < 3; i += 1) {
-      const separation = (i - 1) * 3.2 * clamp((meteor.age - meteor.travelDuration * 0.5) * 3, 0, 1);
-      const fragmentLength = trailLength * (0.14 + i * 0.055);
-      const fragmentHeadX = headX - meteor.directionX * (9 + i * 8) + perpendicularX * separation;
-      const fragmentHeadY = headY - meteor.directionY * (9 + i * 8) + perpendicularY * separation;
-      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.28 * fade})`;
-      ctx.lineWidth = 0.45;
-      ctx.beginPath();
-      ctx.moveTo(fragmentHeadX - meteor.directionX * fragmentLength, fragmentHeadY - meteor.directionY * fragmentLength);
-      ctx.lineTo(fragmentHeadX, fragmentHeadY);
-      ctx.stroke();
-    }
   }
 
   function animationFrame(now) {
